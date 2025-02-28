@@ -1,16 +1,14 @@
 {
-  "name": "life.ho2.ezcharge.ocpp-service",
-  "version": "0.2.0",
-  "description": "HO2 LIFE - OCPP Server",
+  "name": "@hodonsky/ocpp-service",
+  "version": "0.3.0",
+  "description": "[O|N]OpenNetwork - OCPP Service",
   "author": "eric.hodonsky@gmail.com",
-  "license": "ISC",
+  "license": "RPL",
   "scripts": {
-    "test": "mocha --exit --require ./node_modules/babel-core/register",
-    "build-legacy": "npx babel --config-file ./babel.json --out-dir ./build --source-maps --verbose --extensions '.js,.ts' ./src",
-    "prebuild": "rm -rf ./dist",
-    "build": "esbuild ./src/index.ts --bundle --outfile=dist/bundle.js --platform=node --sourcemap",
+    "prebuild": "rm -rf ./bin && npm install",
+    "build": "esbuild ./src/index.ts --bundle --outfile=bin/index.js --platform=node --sourcemap && rm -rf node_modules && cp ./openssl-san.cnf.template bin/ ",
     "prestart": "npm run build && npx pm2 flush",
-    "start": "npx pm2 start --time --no-daemon ./dist/bundle.js -i 1"
+    "start": "npx pm2 start --time --no-daemon ./bin/index.js -i 1"
   },
   "engines": {
     "node": ">=22.9.0",
@@ -18,8 +16,7 @@
   },
   "dependencies": {
     "neo4j-driver": "^5.25.0",
-    "ocpp-rpc": "^2.1.2",
-    "uuid": "^10.0.0"
+    "ocpp-rpc": "^2.2.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.24.8",
@@ -41,7 +38,7 @@
     "@babel/preset-env": "^7.25.4",
     "@babel/preset-typescript": "^7.25.7",
     "@babel/register": "^7.24.6",
-    "@types/node": "^22.7.5",
+    "@types/node": "^22.13.5",
     "babel-loader": "^9.1.3",
     "babel-plugin-module-resolver": "^5.0.2",
     "babel-plugin-tcomb": "^0.4.0",
