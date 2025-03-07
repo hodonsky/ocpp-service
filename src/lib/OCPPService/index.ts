@@ -1,74 +1,102 @@
 "use strict"
-
+/* NodeJS */
 import { randomUUID as uuidv4 }                from "crypto"
 import { exec }                                from "child_process"
 import { readFileSync, writeFileSync, unlink } from "fs"
 import https                                   from "https"
 
+/* Packages */
+import { RPCServer }                           from "ocpp-rpc"
+
+/* Local */
 import Base                                    from "../Base"
+import { EVSEEvents }                          from "../Events"
+import { TNetworkDatabase, TEventsDatabase }   from  "../Database/types"
 
 export class OCPPService extends Base { // implements TOCPPService {
-  #database     : any //TDatabase
-  #ocppConnector: {
-    server  : any
-    hostname: string
-    port    : string
-    ip      : string
-    tls     : {
+  id              : string             = uuidv4()
+
+  #networkDatabase: TNetworkDatabase
+  #eventsDatabase : TEventsDatabase
+  #server         : RPCServer
+  #ocppConnector  : {
+    protocols: string[]
+    hostname : string
+    port     : string
+    ip       : string
+    tls      : {
       keyPath    : string
       certPath   : string
       sanConfPath: string
-    },
-    clientEvents: any
+    }
   }
-
-  id            : string | number | symbol       = uuidv4()
 
   constructor( options ){
     super()
-    this.#database = options.database
+    this.#networkDatabase = options.networkDatabase
     this.#ocppConnector = options.ocppConnector
+    this.#server = new RPCServer({
+        protocols                : this.#ocppConnector.protocols,
+        strictMode               : true,
+        pingIntervalMs           : 400000,
+        respondWithDetailedErrors: true
+    })
+
 
     this.on("processKill", async () => {
-      if ( this.#database.status.connected ) {
-        await this.#database.destroyOCPPService( this.id )
+      if ( this.#networkDatabase.status.connected ) {
+        await this.#networkDatabase.destroyOCPPService( this.id )
       }
     })
 
     this.#setup()
   }
   #setup(){
-    if ( !this.#ocppConnector.server ) {
+    if ( !this.#server ) {
       throw new Error( "No OCPP Connectors available, cannot get connections from chargers")
     }
 
-    this.#ocppConnector.server.auth( async (accept, reject, handshake) => {
+    this.#server.auth( async (accept, reject, handshake) => {
       const tlsClient = handshake.request.client
       if (!tlsClient) return reject( 0, "tls Failure" )
       // dblookup, identity(evse_SN, evse_pass->evse_pass_hash)
       const sessionId = uuidv4()
       accept( { sessionId, serialNumber: handshake.identity } )
       //-- setup connection in database
-      if ( this.#database.status.connected ){
-        await this.#database.addChargerRelationshipToService({
+      if ( this.#networkDatabase.status.connected ){
+        await this.#networkDatabase.createChargerRelationshipWithService({
           sessionId,
           serialNumber: handshake.identity,
-          hostname    : process.env.HOSTNAME
+          hostname    : this.#ocppConnector.hostname
         })
       }
     })
-    this.#ocppConnector.server.on( "client", async ( client ) => {
-      this.on( `ChargerCommand:${client.session.serialNumber}`, ( { command, payload } ) => {
+
+    this.#server.on( "client", async ( client ) => {
+
+      // console.log( `${client.session.sessionId} connected!` );
+      this.on( `ChargerCommand:${client.session.serialNumber}`, ( { command, event } ) => {
+        console.info( `ChargerCommand:${client.session.serialNumber}`, command, event )
         // Authenticate command's author
+          // Server first
+          // idTag
+        
         // Send event to charger
-        console.log( `ChargerCommand:${client.session.serialNumber}`, command, payload )
-        client.emit( command, payload )
+        client.emit( command, event )
       })
-      //console.log( `${client.session.sessionId} connected!` );
+
       // Handle client events
-      Object.entries( this.#ocppConnector.clientEvents )
+      Object.entries( EVSEEvents )
             .forEach( ( [ name, fn ]:[ string, any] ) => {
-              client.handle( name, (...args) => fn( client, ...args) )
+              // Log Raw Event - Time Series?
+              client.handle( name, (...args) => {
+                this.#eventsDatabase.logEvent(
+                                      `evse:${client.session.serialNumber}`,
+                                      `occp-service:${this.id}`,
+                                      { name, args }
+                                    )
+                fn( client, ...args)
+              })
             })
 
       // create a wildcard handler to handle any RPC method
@@ -80,7 +108,7 @@ export class OCPPService extends Base { // implements TOCPPService {
       client.on( "ping", ( ...args )        => console.log( "Pong", ...args ) )
       client.on( "disconnect", ( ...args )  => console.log( "Disconnect: ", ...args ) )
       client.on( "close", async ( ...args ) => {
-        await this.#database.removeChargerRelationshipToService({
+        await this.#networkDatabase.destroyChargerRelationshipWithService({
           hostname    : this.#ocppConnector.hostname,
           sessionId   : client.session.sessionId,
           serialNumber: client.identity
@@ -96,8 +124,8 @@ export class OCPPService extends Base { // implements TOCPPService {
     )
   }
   async listen(): Promise<void>{
-    if ( this.#database ) {
-      await this.#database.connect()
+    if ( this.#networkDatabase ) {
+      await this.#networkDatabase.connect()
     }
     await new Promise<void>( async (resolve, reject) => {
       try {
@@ -121,14 +149,14 @@ export class OCPPService extends Base { // implements TOCPPService {
         enableTrace       : true
       })
       httpsServer.listen( this.#ocppConnector.port, async () => {
-        if ( this.#database.status.connected ){
-          await this.#database.createOCPPService({ cert: this.#ocppConnector.tls.certPath, id: this.id, hostname: this.#ocppConnector.hostname })
+        if ( this.#networkDatabase.status.connected ){
+          await this.#networkDatabase.createOCPPService({ cert: this.#ocppConnector.tls.certPath, serviceUUID: this.id, hostname: this.#ocppConnector.hostname })
         }
         clearTimeout( timeout )
         resolve()
       })
       httpsServer.on( 'error', ( err ) => console.log( "error", err ) );
-      httpsServer.on( 'upgrade', this.#ocppConnector.server.handleUpgrade )
+      httpsServer.on( 'upgrade', this.#server.handleUpgrade )
     })
   }
 }

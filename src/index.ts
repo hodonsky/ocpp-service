@@ -1,56 +1,67 @@
 "use strict"
-/* Paackages */
-import { RPCServer }                      from "ocpp-rpc"
+
+/* Packages */
+import Koa            from "koa"
+import Router         from "@koa/router"
+import { bodyParser } from "@koa/bodyparser"
 
 /* Libraries */
-import OCPPService                        from "./lib/OCPPService"
-import Database                           from "./lib/Database"
-import * as clientEvents                  from "./lib/Events"
+import OCPPService     from "./lib/OCPPService"
+import NetworkDatabase from "./lib/Database/NetworkDatabase"
+import EventsDatabase  from "./lib/Database/EventsDatabase"
 
 /* Local */
 const ocppService = new OCPPService({
     ocppConnector: {
-        server  : new RPCServer({
-            protocols                : [ 'ocpp1.6','ocpp2.0.1' ],
-            strictMode               : true,
-            pingIntervalMs           : 400000,
-            respondWithDetailedErrors: true
-        }),
-        clientEvents,
-        hostname: process.env.HOSTNAME,
-        port    : process.env.PORT,
-        ip      : process.env.IP,
-        tls     : {
+        protocols: [ "ocpp1.6", "ocpp2.0.1" ],
+        hostname : process.env.HOSTNAME,
+        port     : process.env.PORT,
+        ip       : process.env.IP,
+        tls      : {
             keyPath    : "./server.key",
             certPath   : "./server.crt",
             sanConfPath: "../openssl-san.cnf"
         }
     },
-    database: new Database({
+    eventsDatabase: new EventsDatabase({
+        protocol: "http",
+        hostname: process.env.EVENTS_DB_HOSTNAME,
+        port    : process.env.EVENTS_DB_PORT,
+        index   : process.env.EVENTS_DB_INDEX,
+        auth    : {
+            username: process.env.EVENTS_DB_USERNAME,
+            password: process.env.EVENTS_DB_PASSWORD
+        },
+        tls     : {
+            rejectUnauthorized: false
+        }
+    }),
+    networkDatabase: new NetworkDatabase({
         credentials  : {
-            username: "neo4j",
-            password: "password"
+            username: process.env.NETWORK_DB_USERNAME,
+            password: process.env.NETWORK_DB_PASSWORD,
         },
         configuration: {
-            protocol: "neo4j",
-            host    : "neo4j",
-            port    : "7687"
+            protocol: process.env.NETWORK_DB_PROTOCOL,
+            hostname: process.env.NETWORK_DB_HOSTNAME,
+            port    : process.env.NETWORK_DB_BOLT_PORT
         }
     })
 })
-
 ocppService.listen()
 
 
-// const expressServer = new Object()
-// const expressRouter = new Object()
-// const EventShape = []
+const evseServer = new Koa()
+const evseCommandRouter = new Router( { prefix: "/evse/command" } )
 
-// expressRouter.get("/evse/command/:serialNumber/:command", ( serialNumber, command ) => {
-//     const payload = EventShape[command]
-//     ocppService.emit(`ChargerCommand:${serialNumber}`, { command, payload } )
-// })
-// expressServer.listen( expressRouter )
+evseCommandRouter.get("/:serialNumber",
+                        ( { params: { serialNumber }, request:{ body: { command, event } } } ) =>
+                            ocppService.emit(`ChargerCommand:${serialNumber}`, { command, event } ) )
+
+evseServer.use( bodyParser() )
+evseServer.use( evseCommandRouter.routes() )
+evseServer.use( evseCommandRouter.allowedMethods() )
+evseServer.listen( process.env.HTTP_PORT )
 
 // const amqp = new Object()
 // const amqpConn = amqp.connect()

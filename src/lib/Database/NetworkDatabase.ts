@@ -1,48 +1,35 @@
 "use strict"
 
 import neo4j from "neo4j-driver"
-import Base from "../Base"
+import Database from "./Database"
 
-export class Database extends Base {// extends Base implements TDatabase {
+import { TNetworkDatabase } from "./types"
+
+export class NetworkDatabase extends Database implements TNetworkDatabase {
   #credentials : {
-    username  : string
-    passphrase: string
+    username: string
+    password: string
   }
   #link        : any
   #isConnected : boolean
-  configuration: {
-    protocol: string
-    host    : string
-    port    : string
-  }
 
   constructor( options ){
-    super()
-    this.#credentials = {
-      username  : options.credentials.username,
-      passphrase: options.credentials.passphrase
-    }
-    this.configuration = {
-      protocol: options.configuration.protocol,
-      host    : options.configuration.host,
-      port    : options.configuration.port
-    }
+    super( options.configuration )
+    this.#credentials = { ...options.credentials }
+    this.configuration = { ...options.configuration }
   }
   async connect():Promise<void>{
-    const { protocol, host, port } = this.configuration
-    this.#link = neo4j.driver(
-                  `${protocol}://${host}:${port}`,
-                  neo4j.auth.basic( 
-                    this.#credentials.username,
-                    this.#credentials.passphrase
-                  )
-                )
-    this.#isConnected = true;
-  }
-  get status() {
-    return {
-      connected: this.#isConnected
+    const { protocol, hostname, port } = this.configuration
+    if ( !protocol || !hostname || !port ) {
+      throw new Error(`Not enough info, missing protocol, hostname, or port. ${this.configuration}`)
     }
+    const { username, password } = this.#credentials
+    console.log( "credentials: ", username, password )
+    this.#link = neo4j.driver(
+                  `${protocol}://${hostname}:${port}`,
+                  neo4j.auth.basic( username,password )
+                )
+    this.status = { connected: true };
   }
   async #query( query:string, options? ):Promise<void>{
     const session = this.#link.session()
@@ -54,7 +41,7 @@ export class Database extends Base {// extends Base implements TDatabase {
       return await session.close()
     }
   }
-  async createChargerRelationshipWithService( { sessionId, serialNumber, hostname } ){
+  async createChargerRelationshipWithService( { sessionId, serialNumber, hostname } ):Promise<void>{
     const createdDate = new Date().getTime(), updatedDate = createdDate
     await this.#query(`
       MATCH (o:ocppService {hostname: $hostname}), (e:evse { serialNumber: $serialNumber })
@@ -92,4 +79,4 @@ export class Database extends Base {// extends Base implements TDatabase {
   }
 }
 
-export default Database
+export default NetworkDatabase
