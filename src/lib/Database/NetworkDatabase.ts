@@ -57,17 +57,20 @@ export class NetworkDatabase extends Database implements TNetworkDatabase {
       {hostname, sessionId, serialNumber }
     )
   }
-  async createOCPPService({ cert, serviceUUID, hostname }){
+  async createOCPPService({ cert, serviceUUID, hostname, wsport }){
     const now = new Date().getTime()
     await this.#query(`
       MERGE (o:ocppService {hostname:$hostname})
       ON CREATE SET   o.uuid = $serviceUUID,
+                      o.wsport = $wsport,
                       o.createdDate = $createdDate,
                       o.updatedDate = $updatedDate,
                       o.cert = $cert
-      ON MATCH SET    o.updatedDate = $updatedDate,
+      ON MATCH SET    o.uuid = $serviceUUID,
+                      o.wsport = $wsport,
+                      o.updatedDate = $updatedDate,
                       o.cert = $cert;`,
-      { cert, serviceUUID, hostname, createdDate: now, updatedDate: now }
+      { cert, serviceUUID, hostname, wsport, createdDate: now, updatedDate: now }
     )
   }
   async destroyOCPPService( serviceUUID ){

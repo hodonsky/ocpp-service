@@ -22,7 +22,7 @@ export class OCPPService extends Base { // implements TOCPPService {
   #ocppConnector  : {
     protocols: string[]
     hostname : string
-    port     : string
+    wsport   : string
     ip       : string
     tls      : {
       keyPath    : string
@@ -57,6 +57,7 @@ export class OCPPService extends Base { // implements TOCPPService {
     }
 
     this.#server.auth( async (accept, reject, handshake) => {
+      console.log("Attempting auth")
       const tlsClient = handshake.request.client
       if (!tlsClient) return reject( 0, "tls Failure" )
       // dblookup, identity(evse_SN, evse_pass->evse_pass_hash)
@@ -74,7 +75,7 @@ export class OCPPService extends Base { // implements TOCPPService {
 
     this.#server.on( "client", async ( client ) => {
 
-      // console.log( `${client.session.sessionId} connected!` );
+      console.log( `${client.session.sessionId} connected!` );
       this.on( `ChargerCommand:${client.session.serialNumber}`, ( { command, event } ) => {
         console.info( `ChargerCommand:${client.session.serialNumber}`, command, event )
         // Authenticate command's author
@@ -90,6 +91,7 @@ export class OCPPService extends Base { // implements TOCPPService {
             .forEach( ( [ name, fn ]:[ string, any] ) => {
               // Log Raw Event - Time Series?
               client.handle( name, (...args) => {
+                console.log( `CHARGER EVENT[${name}]: ${args}`)
                 this.#eventsDatabase.logEvent(
                                       `evse:${client.session.serialNumber}`,
                                       `occp-service:${this.id}`,
@@ -148,9 +150,15 @@ export class OCPPService extends Base { // implements TOCPPService {
         rejectUnauthorized: true,
         enableTrace       : true
       })
-      httpsServer.listen( this.#ocppConnector.port, async () => {
+      httpsServer.listen( this.#ocppConnector.wsport, async () => {
         if ( this.#networkDatabase.status.connected ){
-          await this.#networkDatabase.createOCPPService({ cert: this.#ocppConnector.tls.certPath, serviceUUID: this.id, hostname: this.#ocppConnector.hostname })
+          console.log( "creating" )
+          await this.#networkDatabase.createOCPPService({
+            cert,
+            serviceUUID: this.id,
+            hostname: this.#ocppConnector.hostname,
+            wsport: this.#ocppConnector.wsport
+          })
         }
         clearTimeout( timeout )
         resolve()

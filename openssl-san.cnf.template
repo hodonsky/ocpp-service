@@ -9,7 +9,7 @@ distinguished_name = dn
 C  = US
 ST = California
 L  = Los_Angeles
-O  = HO2_Life
+O  = OpenNetwork
 CN = {{CN}}
 
 [ req_ext ]

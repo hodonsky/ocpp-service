@@ -15,12 +15,12 @@ const ocppService = new OCPPService({
     ocppConnector: {
         protocols: [ "ocpp1.6", "ocpp2.0.1" ],
         hostname : process.env.HOSTNAME,
-        port     : process.env.PORT,
+        wsport   : process.env.OCPP_PORT,
         ip       : process.env.IP,
         tls      : {
             keyPath    : "./server.key",
             certPath   : "./server.crt",
-            sanConfPath: "../openssl-san.cnf"
+            sanConfPath: "./openssl-san.cnf"
         }
     },
     eventsDatabase: new EventsDatabase({
@@ -42,7 +42,7 @@ const ocppService = new OCPPService({
             password: process.env.NETWORK_DB_PASSWORD,
         },
         configuration: {
-            protocol: process.env.NETWORK_DB_PROTOCOL,
+            protocol: process.env.NETWORK_DB_BOLT_PROTOCOL,
             hostname: process.env.NETWORK_DB_HOSTNAME,
             port    : process.env.NETWORK_DB_BOLT_PORT
         }

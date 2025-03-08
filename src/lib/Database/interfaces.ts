@@ -29,7 +29,7 @@ export interface IEventsDatabaseConfiguration {
 export interface INetworkDatabase {
   createChargerRelationshipWithService(payload:{ sessionId:string, serialNumber:string, hostname:string }):Promise<void>
   destroyChargerRelationshipWithService(payload:{ hostname:string, sessionId:string, serialNumber:string }):Promise<void>
-  createOCPPService(payload:{ cert:string, serviceUUID:string, hostname:string }):Promise<void>
+  createOCPPService(payload:{ cert:string, serviceUUID:string, hostname:string, wsport:string }):Promise<void>
   destroyOCPPService(serviceUUID:string):Promise<void>
 }
 
