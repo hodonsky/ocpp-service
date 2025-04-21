@@ -131,3 +131,5 @@ dist
 
 bin
 bin/*
+
+.DS_Store
