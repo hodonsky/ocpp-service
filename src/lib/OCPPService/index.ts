@@ -90,14 +90,17 @@ export class OCPPService extends Base { // implements TOCPPService {
       Object.entries( EVSEEvents )
             .forEach( ( [ name, fn ]:[ string, any] ) => {
               // Log Raw Event - Time Series?
-              client.handle( name, (...args) => {
+              client.handle( name, async (...args) => {
                 console.log( `CHARGER EVENT[${name}]: ${args}`)
-                this.#eventsDatabase.logEvent(
+                try {
+                  await this.#eventsDatabase.logEvent(
                                       `evse:${client.session.serialNumber}`,
                                       `occp-service:${this.id}`,
                                       { name, args }
                                     )
-                fn( client, ...args)
+                } finally {
+                  fn( client, ...args)
+                }
               })
             })
 
