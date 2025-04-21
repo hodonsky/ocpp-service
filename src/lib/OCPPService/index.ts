@@ -44,9 +44,9 @@ export class OCPPService extends Base { // implements TOCPPService {
 
 
     this.on("processKill", async () => {
-      if ( this.#networkDatabase.status.connected ) {
+      //if ( this.#networkDatabase.status.connected ) {
         await this.#networkDatabase.destroyOCPPService( this.id )
-      }
+      //}
     })
 
     this.#setup()
@@ -108,7 +108,7 @@ export class OCPPService extends Base { // implements TOCPPService {
       });
 
       client.on( "ping", ( ...args )        => console.log( "Pong", ...args ) )
-      client.on( "disconnect", ( ...args )  => {
+      client.on( "disconnect", async ( ...args )  => {
         console.log( "Disconnect: ", ...args )
         await this.#networkDatabase.destroyChargerRelationshipWithService({
           hostname    : this.#ocppConnector.hostname,
