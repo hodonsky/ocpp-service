@@ -46,8 +46,20 @@ export class OCPPService extends Base { // implements TOCPPService {
     this.on("processKill", async () => {
       //if ( this.#networkDatabase.status.connected ) {
         await this.#networkDatabase.destroyOCPPService( this.id )
+        process.exit(0);
       //}
     })
+    process.on('SIGTERM', async () => {
+      console.log('Received SIGTERM, shutting down gracefully...');
+      await this.#networkDatabase.destroyOCPPService( this.id )
+      process.exit(0);
+    });
+    
+    process.on('SIGINT', async () => {
+      console.log('Received SIGINT (Ctrl+C), shutting down...');
+      await this.#networkDatabase.destroyOCPPService( this.id )
+      process.exit(0);
+    });
 
     this.#setup()
   }
