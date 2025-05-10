@@ -72,9 +72,23 @@ export class OCPPService extends Base { // implements TOCPPService {
       console.log("Attempting auth")
       const tlsClient = handshake.request.client
       if (!tlsClient) return reject( 0, "tls Failure" )
-      // dblookup, identity(evse_SN, evse_pass->evse_pass_hash)
+
+      //compare the public key with the one in the database
+      if ( !this.#networkDatabase.status.connected ) return reject( 0, "No Network Database" )
+      const charger = await this.#networkDatabase.getChargerBySerialNumber( handshake.identity )
+      if ( !charger ) return reject( 0, "Charger not found" )
+      if ( !charger.publicKey ) return reject( 0, "Charger public key not found" )
+
+      const clientCert = tlsClient.getPeerCertificate()
+      if ( !clientCert || !clientCert.raw ) return reject( 0, "Client certificate not found" )
+      
+      const publicKey = clientCert.raw.toString("base64")
+      if ( charger.publicKey !== publicKey ) return reject( 0, "Public key mismatch" )
+
       const sessionId = uuidv4()
       accept( { sessionId, serialNumber: handshake.identity } )
+      console.log( `Accepted connection from ${handshake.identity} with sessionId ${sessionId}` )
+
       //-- setup connection in database
       if ( this.#networkDatabase.status.connected ){
         await this.#networkDatabase.createChargerRelationshipWithService({
@@ -169,7 +183,18 @@ export class OCPPService extends Base { // implements TOCPPService {
       const httpsServer = https.createServer({
         cert, key,
         minVersion        : "TLSv1.2",
-        rejectUnauthorized: true,
+        rejectUnauthorized: false,
+        requestCert       : true,
+        // secureContext     : {
+        //   minVersion: "TLSv1.2"
+        // },
+        // SNICallback: (servername, cb) => {
+        //   console.log( "SNI Callback", servername )
+        //   cb( null, https.createSecureContext({
+        //     key, cert,
+        //     minVersion: "TLSv1.2"
+        //   }))
+        // },
         enableTrace       : true
       })
       httpsServer.listen( this.#ocppConnector.wsport, async () => {

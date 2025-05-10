@@ -80,6 +80,21 @@ export class NetworkDatabase extends Database implements TNetworkDatabase {
       { serviceUUID }
     )
   }
+  async getChargerBySerialNumber( serialNumber:string ):Promise<any>{
+    const result = await this.#query(`
+      MATCH (e:evse {serialNumber:$serialNumber})
+      RETURN e`,
+      { serialNumber }
+    )
+    return result
+  }
+  async disconnect():Promise<void>{
+    if ( this.#link ) {
+      await this.#link.close()
+      this.#link = undefined
+    }
+    this.status = { connected: false }
+  }
 }
 
 export default NetworkDatabase

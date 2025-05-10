@@ -1,6 +1,6 @@
 "use strict"
 
-import { EEventSource, EEventTarget } from "./enums"
+//import { EEventSource, EEventTarget } from "./enums"
 
 export interface IDatabaseConfiguration {
   protocol: string
@@ -31,6 +31,7 @@ export interface INetworkDatabase {
   destroyChargerRelationshipWithService(payload:{ hostname:string, sessionId:string, serialNumber:string }):Promise<void>
   createOCPPService(payload:{ cert:string, serviceUUID:string, hostname:string, wsport:string }):Promise<void>
   destroyOCPPService(serviceUUID:string):Promise<void>
+  getChargerBySerialNumber(serialNumber:string):Promise<any>
 }
 
 export interface IEventsDatabase {
